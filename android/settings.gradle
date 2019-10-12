@@ -1,0 +1,3 @@
+rootProject.name = 'ReadLikeTalking'
+
+include ':app'
