@@ -1,6 +1,7 @@
 (ns read-like-talking.android.core
   (:require [reagent.core :as r :refer [atom]]
             [re-frame.core :refer [subscribe dispatch dispatch-sync]]
+            [kitchen-async.promise :as p]
             [read-like-talking.events]
             [read-like-talking.subs]))
 
@@ -13,6 +14,7 @@
 (def touchable-highlight (r/adapt-react-class (.-TouchableHighlight ReactNative)))
 
 (def logo-img (js/require "./images/cljs.png"))
+(def Voice (.-default (js/require "react-native-voice")))
 
 (defn alert [title]
       (.alert (.-Alert ReactNative) title))
