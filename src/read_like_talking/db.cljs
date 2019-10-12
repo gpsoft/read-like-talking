@@ -2,9 +2,12 @@
   (:require [clojure.spec.alpha :as s]))
 
 ;; spec of app-db
-(s/def ::greeting string?)
+(s/def ::talk1 string?)
+(s/def ::talk2 string?)
 (s/def ::app-db
-  (s/keys :req-un [::greeting]))
+  (s/keys :req-un [::talk1 ::talk2]))
 
 ;; initial state of app-db
-(def app-db {:greeting "Hello Clojure in iOS and Android!"})
+(def app-db {:status :idling
+             :talk1 ""
+             :talk2 ""})

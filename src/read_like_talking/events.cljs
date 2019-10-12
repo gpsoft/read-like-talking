@@ -29,7 +29,13 @@
    app-db))
 
 (reg-event-db
- :set-greeting
+ :set-status
  validate-spec
  (fn [db [_ value]]
-   (assoc db :greeting value)))
+   (assoc db :status value)))
+
+(reg-event-db
+ :set-talk
+ validate-spec
+ (fn [db [_ value]]
+   (assoc db :talk1 "hey" :talk2 "yo")))
