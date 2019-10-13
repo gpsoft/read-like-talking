@@ -98,7 +98,7 @@
 (defn main-content []
   (let [status (subscribe [:status])
         talk (subscribe [:talk])
-        result-style {:style (text-style "black" :flex-grow 1 :font-size 36)}]
+        result-style (text-style "black" :flex-grow 1 :font-size 36)]
     (fn []
       [view {:style {:flex-grow 1
                      :flex-direction "column"
@@ -118,7 +118,8 @@
                         :flex-direction "column"}}
           [text {:style (assoc result-style :background-color color-talk1)}
            (first @talk)]
-          [text {:style (assoc result-style :background-color color-talk2)}
+          [text {:style (assoc result-style :background-color color-talk2
+                               :font-size 28)}
            (clojure.string/join \newline (next @talk))]])])))
 
 (defn footer []
