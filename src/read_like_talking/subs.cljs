@@ -7,11 +7,6 @@
     (:status db)))
 
 (reg-sub
-  :get-talk1
+  :get-talk
   (fn [db _]
-    (:talk1 db)))
-
-(reg-sub
-  :get-talk2
-  (fn [db _]
-    (:talk2 db)))
+    (:talk db)))

@@ -17,24 +17,30 @@
 (def logo-img (js/require "./images/cljs.png"))
 
 (def Voice (.-default (js/require "react-native-voice")))
-(set! (.-onSpeechResults Voice) #(dispatch [:set-talk ""]))
 (defn voice-talk []
-  (p/do #_(.cancel Voice)
-        #_(.start Voice "ja-JP")
-        (dispatch [:set-status :talking])))
+  (p/do (dispatch [:set-status :talking])
+        (.cancel Voice)
+        (.start Voice "ja_JP")))
 (defn voice-idle []
-  (p/do #_(.cancel Voice)
+  (p/do (.cancel Voice)
         (dispatch [:set-status :idling])))
-; (.start Voice "ja-JP")
-; (p/let [a (.start Voice "ja-JP")] (js/alert "hey"))
+(defn voice-read [res]
+  (let [res-v (js->clj (.-value res))]
+    (dispatch [:set-talk res-v])
+    (dispatch [:set-status :reading])))
+(set! (.-onSpeechResults Voice) #(voice-read %))
+(set! (.-onSpeechError Voice) #(js/alert (.-error.message %)))
+
+; (.start Voice "ja_JP")
+; (p/let [a (.start Voice "ja_JP")] (js/alert "hey"))
 (comment
   ; (.isAvailable Voice)
-  (p/let [a (.start Voice "ja-JP")] (prn "hey"))
+  (p/let [a (.start Voice "ja_JP")] (prn "hey"))
   (dispatch [:set-status :idling])
   (dispatch [:set-status :talking])
   (dispatch [:set-status :reading])
-  (dispatch [:set-talk "今季は6月までの前半戦で3勝を挙げ、一時は独走態勢に。しかし、後半戦に入り持病の左手首痛が再発。さらに渋野の躍進で、前週の日本女子オープンまでに約860万円差まで詰め寄られた。"])
   )
+
 
 (def color-main "#336699")
 (def color-sub "#ff6e5a")
@@ -70,13 +76,12 @@
          (if (= @status :talking)
            [text {:style (text-style "#444" :padding 16)} "お話しください……"]
            [button {:style (button-style color-sub :margin-left 0 :margin-right 0 :border-radius 0)
-                    :on-press #(alert "HELLO!")}
+                    :on-press #(voice-talk)}
             [text {:style (text-style "white")} "🎤 会話を続ける 👂"]])]))))
 
 (defn main-content []
   (let [status (subscribe [:get-status])
-        talk1 (subscribe [:get-talk1])
-        talk2 (subscribe [:get-talk2])]
+        talk (subscribe [:get-talk])]
     (fn []
       [view {:style {:flex-grow 1
                      :flex-direction "column"
@@ -93,8 +98,8 @@
            [text {:style (text-style "white" :padding-left 20 :padding-right 20)} "おしゃべり開始"]]]
          [view {:style {:flex-grow 1
                         :flex-direction "column"}}
-          [text {:style (text-style "black" :flex-grow 1 :font-size 36 :background-color color-talk1)} @talk1]
-          [text {:style (text-style "black" :flex-grow 1 :font-size 36 :background-color color-talk2)} @talk2]])])))
+          [text {:style (text-style "black" :flex-grow 1 :font-size 36 :background-color color-talk1)} (first @talk)]
+          [text {:style (text-style "black" :flex-grow 1 :font-size 36 :background-color color-talk2)} (str (rest @talk))]])])))
 
 (defn footer []
   (let [status (subscribe [:get-status])]

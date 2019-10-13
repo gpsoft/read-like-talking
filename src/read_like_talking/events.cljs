@@ -38,4 +38,4 @@
  :set-talk
  validate-spec
  (fn [db [_ value]]
-   (assoc db :talk1 "hey" :talk2 "yo")))
+   (assoc db :talk value)))
