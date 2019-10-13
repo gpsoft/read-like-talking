@@ -10,37 +10,51 @@
 (def app-registry (.-AppRegistry ReactNative))
 (def text (r/adapt-react-class (.-Text ReactNative)))
 (def view (r/adapt-react-class (.-View ReactNative)))
-(def image (r/adapt-react-class (.-Image ReactNative)))
+#_(def image (r/adapt-react-class (.-Image ReactNative)))
 (def button (r/adapt-react-class (.-TouchableHighlight ReactNative)))
 (def back (.-BackHandler ReactNative))
 
-(def logo-img (js/require "./images/cljs.png"))
+#_(def logo-img (js/require "./images/cljs.png"))
 
 (def Voice (.-default (js/require "react-native-voice")))
-(defn voice-talk []
-  (p/do (dispatch [:set-status :talking])
-        (.cancel Voice)
-        (.start Voice "ja_JP")))
+(def err-code-timeout 6)
+(def err-code-nomatch 7)
+
 (defn voice-idle []
   (p/do (.cancel Voice)
-        (dispatch [:set-status :idling])))
-(defn voice-read [res]
+        (dispatch [:go-idling])))
+
+(defn voice-talk []
+  (p/do (.cancel Voice)
+        (dispatch [:start-talking])
+        (.start Voice "ja_JP")))
+
+(defn voice-result [res]
   (let [res-v (js->clj (.-value res))]
-    (dispatch [:set-talk res-v])
-    (dispatch [:set-status :reading])))
-(set! (.-onSpeechResults Voice) #(voice-read %))
-(set! (.-onSpeechError Voice) #(js/alert (.-error.message %)))
+    (dispatch [:on-result res-v])))
 
-; (.start Voice "ja_JP")
-; (p/let [a (.start Voice "ja_JP")] (js/alert "hey"))
+(defn voice-error [err]
+  (let [err (.-error.message err)
+        [code msg] (clojure.string.split err "/")
+        code (int code)]
+    (if (#{err-code-timeout err-code-nomatch} code)
+      (voice-talk)
+      (dispatch [:on-error code msg]))))
+
+(defn voice-init []
+  (set! (.-onSpeechResults Voice) #(voice-result %))
+  (set! (.-onSpeechError Voice) #(voice-error %)))
+
 (comment
-  ; (.isAvailable Voice)
-  (p/let [a (.start Voice "ja_JP")] (prn "hey"))
-  (dispatch [:set-status :idling])
-  (dispatch [:set-status :talking])
-  (dispatch [:set-status :reading])
+  (p/let [a (.isAvailable Voice)] (js/alert a))
+  (p/let [a (.isRecognizing Voice)] (js/alert a))
+  (p/let [a (.getSpeechRecognitionServices Voice)] (js/alert (js->clj a)))
+  (dispatch [:go-idling])
+  (dispatch [:start-talking])
+  (dispatch [:on-result ["yo" "hey" "hi"]])
+  (dispatch [:on-error 7 "No match"])
+  (dispatch [:on-error 8 "Unknown"])
   )
-
 
 (def color-main "#336699")
 (def color-sub "#ff6e5a")
@@ -68,20 +82,23 @@
       (.alert (.-Alert ReactNative) title))
 
 (defn header []
-  (let [status (subscribe [:get-status])]
+  (let [status (subscribe [:status])]
     (fn []
       (when (not= @status :idling)
         [view {:style {:flex-grow 0
                        :flex-direction "column"}}
          (if (= @status :talking)
            [text {:style (text-style "#444" :padding 16)} "お話しください……"]
-           [button {:style (button-style color-sub :margin-left 0 :margin-right 0 :border-radius 0)
-                    :on-press #(voice-talk)}
+           [button {:style (button-style color-sub
+                                         :margin-left 0
+                                         :margin-right 0 :border-radius 0)
+                    :on-press voice-talk}
             [text {:style (text-style "white")} "🎤 会話を続ける 👂"]])]))))
 
 (defn main-content []
-  (let [status (subscribe [:get-status])
-        talk (subscribe [:get-talk])]
+  (let [status (subscribe [:status])
+        talk (subscribe [:talk])
+        result-style {:style (text-style "black" :flex-grow 1 :font-size 36)}]
     (fn []
       [view {:style {:flex-grow 1
                      :flex-direction "column"
@@ -94,22 +111,25 @@
                         :align-items "center"
                         :justify-content "center"}}
           [button {:style (button-style color-main)
-                   :on-press #(voice-talk)}
-           [text {:style (text-style "white" :padding-left 20 :padding-right 20)} "おしゃべり開始"]]]
+                   :on-press voice-talk}
+           [text {:style (text-style "white" :padding-left 20 :padding-right 20)}
+            "おしゃべり開始"]]]
          [view {:style {:flex-grow 1
                         :flex-direction "column"}}
-          [text {:style (text-style "black" :flex-grow 1 :font-size 36 :background-color color-talk1)} (first @talk)]
-          [text {:style (text-style "black" :flex-grow 1 :font-size 36 :background-color color-talk2)} (str (rest @talk))]])])))
+          [text {:style (assoc result-style :background-color color-talk1)}
+           (first @talk)]
+          [text {:style (assoc result-style :background-color color-talk2)}
+           (clojure.string/join \newline (next @talk))]])])))
 
 (defn footer []
-  (let [status (subscribe [:get-status])]
+  (let [status (subscribe [:status])]
     (fn []
       [view {:style {:flex-grow 0
                      :flex-direction "row"
                      :padding-bottom 8}}
        (when (not= @status :idling)
          [button {:style (button-style color-sub :flex-grow 1)
-                  :on-press #(voice-idle)}
+                  :on-press voice-idle}
           [text {:style (text-style "white" :font-weight "bold")} "休憩する"]])
        [button {:style (button-style color-sub :flex-grow 1)
                 :on-press #(.exitApp back)}
@@ -123,28 +143,9 @@
      [header]
      [main-content]
      [footer]]
-    )
-  #_(let [talk1 (subscribe [:get-talk1])
-          talk2 (subscribe [:get-talk2])]
-      (fn []
-        [view {:style {:flex-direction "column"
-                       :margin 20
-                       :align-items "stretch"}}
-         [button {:style {:background-color "#d75341"
-                          :padding 16
-                          :margin 20
-                          :border-radius 4}
-                  :on-press #(alert "HELLO!")}
-          [text {:style {:color "white"
-                         :font-size 24
-                         :text-align "center"
-                         :font-weight "bold"}}
-           "聞いて〜"]]
-         [text {:style {:background-color "#e9ffd3" :padding 12 :font-size 30 :font-weight "100" :margin-bottom 20 :text-align "center"}} @talk1]
-         [text {:style {:background-color "#d9e5ff" :padding 12 :font-size 30 :font-weight "100" :margin-bottom 20 :text-align "center"}} @talk2]
-         #_[image {:source logo-img
-                   :style  {:width 80 :height 80 :margin-bottom 30}}]])))
+    ))
 
 (defn init []
   (dispatch-sync [:initialize-db])
+  (voice-init)
   (.registerComponent app-registry "ReadLikeTalking" #(r/reactify-component app-root)))

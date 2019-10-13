@@ -2,11 +2,16 @@
   (:require [re-frame.core :refer [reg-sub]]))
 
 (reg-sub
-  :get-status
+  :status
   (fn [db _]
     (:status db)))
 
 (reg-sub
-  :get-talk
+  :talk
   (fn [db _]
     (:talk db)))
+
+(reg-sub
+  :last-error
+  (fn [db _]
+    (:last-error db)))

@@ -39,3 +39,32 @@
  validate-spec
  (fn [db [_ value]]
    (assoc db :talk value)))
+
+(reg-event-db
+ :go-idling
+ validate-spec
+ (fn [db [_]]
+   (assoc db :status :idling :talk [])))
+
+(reg-event-db
+  :start-talking
+  validate-spec
+  (fn [db [_]]
+    (-> db
+        (assoc :status :talking :talk [])
+        (dissoc :last-error))))
+
+(reg-event-db
+  :on-result
+  validate-spec
+  (fn [db [_ value]]
+    (-> db
+        (assoc :status :reading :talk value)
+        (dissoc :last-error))))
+
+(reg-event-db
+  :on-error
+  validate-spec
+  (fn [db [_ code desc]]
+    (assoc db :status :reading :talk ["" desc])
+    #_(assoc db :status :error :talk [] :last-error [code desc])))
