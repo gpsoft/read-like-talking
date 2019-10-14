@@ -3,7 +3,10 @@
             [re-frame.core :refer [subscribe dispatch dispatch-sync]]
             [kitchen-async.promise :as p]
             [read-like-talking.events]
-            [read-like-talking.subs]))
+            [read-like-talking.subs]
+            [read-like-talking.android.voice :as v]))
+
+(def ^:private d (if goog.DEBUG (fn [e] (prn e) e) identity))
 
 (def ReactNative (js/require "react-native"))
 
@@ -16,45 +19,23 @@
 
 #_(def logo-img (js/require "./images/cljs.png"))
 
-(def Voice (.-default (js/require "react-native-voice")))
-(def err-code-timeout 6)
-(def err-code-nomatch 7)
+(defn start-talking []
+  (p/do (dispatch [:start-talking])
+        (v/talk!)))
 
-(defn voice-idle []
-  (p/do (.cancel Voice)
+(defn go-idling []
+  (p/do (v/cancel!)
         (dispatch [:go-idling])))
 
-(defn voice-talk []
-  (p/do (.cancel Voice)
-        (dispatch [:start-talking])
-        (.start Voice "ja_JP")))
-
-(defn voice-result [res]
-  (let [res-v (js->clj (.-value res))]
+(defn on-result [res]
+  (let [res-v (v/result-v res)]
     (dispatch [:on-result res-v])))
 
-(defn voice-error [err]
-  (let [err (.-error.message err)
-        [code msg] (clojure.string.split err "/")
-        code (int code)]
-    (if (#{err-code-timeout err-code-nomatch} code)
-      (voice-talk)
-      (dispatch [:on-error code msg]))))
-
-(defn voice-init []
-  (set! (.-onSpeechResults Voice) #(voice-result %))
-  (set! (.-onSpeechError Voice) #(voice-error %)))
-
-(comment
-  (p/let [a (.isAvailable Voice)] (js/alert a))
-  (p/let [a (.isRecognizing Voice)] (js/alert a))
-  (p/let [a (.getSpeechRecognitionServices Voice)] (js/alert (js->clj a)))
-  (dispatch [:go-idling])
-  (dispatch [:start-talking])
-  (dispatch [:on-result ["yo" "hey" "hi"]])
-  (dispatch [:on-error 7 "No match"])
-  (dispatch [:on-error 8 "Unknown"])
-  )
+(defn on-error [err]
+  (let [[code desc] (d (v/error-v err))]
+    (if (v/retryable-error? code)
+      (v/talk!)
+      (dispatch [:on-error code desc]))))
 
 (def color-main "#336699")
 (def color-sub "#ff6e5a")
@@ -62,6 +43,14 @@
 (def color-talk1 "#e9ffd3")
 (def color-talk2 "#d9e5ff")
 (def color-none "#ffffff00")
+
+(comment
+  (dispatch [:go-idling])
+  (dispatch [:start-talking])
+  (dispatch [:on-result ["yo" "hey" "hi"]])
+  (dispatch [:on-error 7 "No match"])
+  (dispatch [:on-error 8 "Unknown"])
+  )
 
 (defn text-style [color & kvs]
   (let [m {:color color
@@ -79,7 +68,7 @@
     (if kvs (apply assoc m kvs) m)))
 
 (defn alert [title]
-      (.alert (.-Alert ReactNative) title))
+  (.alert (.-Alert ReactNative) title))
 
 (defn header []
   (let [status (subscribe [:status])]
@@ -88,12 +77,15 @@
         [view {:style {:flex-grow 0
                        :flex-direction "column"}}
          (if (= @status :talking)
-           [text {:style (text-style "#444" :padding 16)} "お話しください……"]
+           [text {:style (text-style "#444" :padding 16)}
+            "お話しください……"]
            [button {:style (button-style color-sub
                                          :margin-left 0
-                                         :margin-right 0 :border-radius 0)
-                    :on-press voice-talk}
-            [text {:style (text-style "white")} "🎤 会話を続ける 👂"]])]))))
+                                         :margin-right 0
+                                         :border-radius 0)
+                    :on-press #(start-talking)}
+            [text {:style (text-style "white")}
+             "🎤 会話を続ける 👂"]])]))))
 
 (defn main-content []
   (let [status (subscribe [:status])
@@ -111,8 +103,9 @@
                         :align-items "center"
                         :justify-content "center"}}
           [button {:style (button-style color-main)
-                   :on-press voice-talk}
-           [text {:style (text-style "white" :padding-left 20 :padding-right 20)}
+                   :on-press #(start-talking)}
+           [text {:style (text-style "white"
+                                     :padding-left 20 :padding-right 20)}
             "おしゃべり開始"]]]
          [view {:style {:flex-grow 1
                         :flex-direction "column"}}
@@ -130,11 +123,13 @@
                      :padding-bottom 8}}
        (when (not= @status :idling)
          [button {:style (button-style color-sub :flex-grow 1)
-                  :on-press voice-idle}
-          [text {:style (text-style "white" :font-weight "bold")} "休憩する"]])
+                  :on-press #(go-idling)}
+          [text {:style (text-style "white" :font-weight "bold")}
+           "休憩する"]])
        [button {:style (button-style color-sub :flex-grow 1)
                 :on-press #(.exitApp back)}
-        [text {:style (text-style "white" :font-weight "bold")} "終わる"]]])))
+        [text {:style (text-style "white" :font-weight "bold")}
+         "終わる"]]])))
 
 (defn app-root []
   (fn []
@@ -148,5 +143,7 @@
 
 (defn init []
   (dispatch-sync [:initialize-db])
-  (voice-init)
-  (.registerComponent app-registry "ReadLikeTalking" #(r/reactify-component app-root)))
+  (v/init! on-result on-error)
+  (.registerComponent app-registry
+                      "ReadLikeTalking"
+                      #(r/reactify-component app-root)))

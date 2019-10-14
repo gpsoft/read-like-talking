@@ -29,18 +29,6 @@
    app-db))
 
 (reg-event-db
- :set-status
- validate-spec
- (fn [db [_ value]]
-   (assoc db :status value)))
-
-(reg-event-db
- :set-talk
- validate-spec
- (fn [db [_ value]]
-   (assoc db :talk value)))
-
-(reg-event-db
  :go-idling
  validate-spec
  (fn [db [_]]
