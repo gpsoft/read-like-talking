@@ -12,6 +12,11 @@
     (:talk db)))
 
 (reg-sub
+  :keep
+  (fn [db _]
+    (:keep db)))
+
+(reg-sub
   :last-error
   (fn [db _]
     (:last-error db)))

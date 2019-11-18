@@ -19,9 +19,12 @@
 
 #_(def logo-img (js/require "./images/cljs.png"))
 
-(defn start-talking []
-  (p/do (dispatch [:start-talking])
-        (v/talk!)))
+(defn start-talking
+  ([]
+   (start-talking nil))
+  ([keep]
+   (p/do (dispatch [:start-talking keep])
+         (v/talk!))))
 
 (defn go-idling []
   (p/do (v/cancel!)
@@ -87,9 +90,44 @@
             [text {:style (text-style "white")}
              "🎤 会話を続ける 👂"]])]))))
 
+(defn reading
+  [s prim?]
+  (let [fs (if prim? 36 28)
+        mg (if prim? 24 26)
+        bc (if prim? color-talk1 color-talk2)
+        result-style (text-style "black"
+                                 :flex-grow 1
+                                 :font-size fs
+                                 :background-color bc)]
+    [view {:style {:flex-grow 1
+                   :flex-direction "row"}}
+     [text {:style result-style} s]
+     [button {:style (assoc (button-style color-main)
+                            :margin-top 4
+                            :margin-bottom 4
+                            :padding-left mg
+                            :padding-right mg)
+              :on-press #(start-talking s)}
+      [text {:style (text-style "white" :flex-grow 1 :font-size fs)} "+"]]]))
+
+(defn result-reading
+  [talk keep]
+  (let [prim (first talk)
+        subs (take 3 (next talk))
+        keep (if keep (str keep \newline) "")
+        result-style (text-style "black" :flex-grow 1 :font-size 36)]
+    [view {:style {:flex-grow 1
+                   :flex-direction "column"}}
+     [reading (str keep prim) true]
+     [view {:style {:flex-grow 0
+                    :flex-direction "column"}}
+      (for [s subs]
+        ^{:key s} [reading s false])]]))
+
 (defn main-content []
   (let [status (subscribe [:status])
         talk (subscribe [:talk])
+        keep (subscribe [:keep])
         result-style (text-style "black" :flex-grow 1 :font-size 36)]
     (fn []
       [view {:style {:flex-grow 1
@@ -107,7 +145,8 @@
            [text {:style (text-style "white"
                                      :padding-left 20 :padding-right 20)}
             "おしゃべり開始"]]]
-         [view {:style {:flex-grow 1
+         [result-reading @talk @keep]
+         #_[view {:style {:flex-grow 1
                         :flex-direction "column"}}
           [text {:style (assoc result-style :background-color color-talk1)}
            (first @talk)]

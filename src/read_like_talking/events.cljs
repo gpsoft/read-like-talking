@@ -37,9 +37,10 @@
 (reg-event-db
   :start-talking
   validate-spec
-  (fn [db [_]]
+  (fn [db [_ keep]]
     (-> db
         (assoc :status :talking :talk [])
+        (assoc :keep keep)
         (dissoc :last-error))))
 
 (reg-event-db
